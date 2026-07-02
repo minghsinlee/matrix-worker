@@ -93,32 +93,21 @@
     ]
   },
 
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["RoomDurableObject", "SyncDurableObject", "FederationDurableObject"]
-    },
-    {
-      "tag": "v2",
-      "new_classes": ["CallRoomDurableObject"]
-    },
-    {
-      "tag": "v3",
-      "new_classes": ["AdminDurableObject"]
-    },
-    {
-      "tag": "v4",
-      "new_classes": ["UserKeysDurableObject"]
-    },
-    {
-      "tag": "v5",
-      "new_classes": ["PushDurableObject"]
-    },
-    {
-      "tag": "v6",
-      "new_classes": ["RateLimitDurableObject"]
-    }
-  ],
+"migrations": [
+  {
+    "tag": "v1",
+    "new_sqlite_classes": [
+      "RoomDurableObject",
+      "SyncDurableObject",
+      "FederationDurableObject",
+      "CallRoomDurableObject",
+      "AdminDurableObject",
+      "UserKeysDurableObject",
+      "PushDurableObject",
+      "RateLimitDurableObject"
+    ]
+  }
+]
 
   // Environment variables
   "vars": {
