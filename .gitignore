@@ -41,3 +41,7 @@ coverage/
 droplet*.json
 register-admin.json
 test-jwt.json
+
+# Codex agent guidance (local-only)
+AGENTS.md
+
