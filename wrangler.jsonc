@@ -107,7 +107,7 @@
       "RateLimitDurableObject"
     ]
   }
-]
+],
 
   // Environment variables
   "vars": {
