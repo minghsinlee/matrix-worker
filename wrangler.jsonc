@@ -142,7 +142,7 @@
   // Custom domain routing
   "routes": [
     {
-      "pattern": "mt_worker.linkact.top",
+      "pattern": "mt-worker.linkact.top",
       "custom_domain": true
     }
   ],
