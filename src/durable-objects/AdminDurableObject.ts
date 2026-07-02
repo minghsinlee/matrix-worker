@@ -67,8 +67,115 @@ export class AdminDurableObject extends DurableObject<Env> {
         return this.handleBroadcast(request);
       case '/invalidate-cache':
         return this.handleInvalidateCache();
+      case '/bootstrap':
+        return this.handleBootstrap(request);
+      case '/bootstrap/status': {
+        const done = await this.ctx.storage.get<{ completed: boolean; reason: string; username?: string; at: number }>('bootstrap_done');
+        const adminExists = await this.env.DB.prepare(
+          'SELECT user_id FROM users WHERE admin = 1 LIMIT 1'
+        ).first<{ user_id: string }>();
+        return Response.json({
+          configured: !!(this.env.ADMIN_USERNAME && this.env.ADMIN_PASSWORD),
+          previous_run: done ?? null,
+          admin_exists: !!adminExists,
+          admin_user_id: adminExists?.user_id ?? null,
+        });
+      }
       default:
         return new Response('Not found', { status: 404 });
+    }
+  }
+
+  // Idempotent bootstrap: ensure at least one admin user exists.
+  // If ADMIN_USERNAME/ADMIN_PASSWORD env vars are set and no admin exists,
+  // create the user. Uses a DO storage lock to prevent concurrent creation.
+  private async handleBootstrap(request: Request): Promise<Response> {
+    if (request.method !== 'POST') {
+      return new Response('Method not allowed', { status: 405 });
+    }
+
+    const force = new URL(request.url).searchParams.get('force') === '1';
+
+    const username = this.env.ADMIN_USERNAME;
+    const password = this.env.ADMIN_PASSWORD;
+
+    // No bootstrap configured -> nothing to do, mark done to avoid repeated checks
+    if (!username || !password) {
+      await this.ctx.storage.put('bootstrap_done', { completed: true, reason: 'no_config', at: Date.now() });
+      return Response.json({ ok: true, action: 'skipped', reason: 'no_config' });
+    }
+
+    // Fast path: already bootstrapped previously (skip if not forced)
+    if (!force) {
+      const done = await this.ctx.storage.get<{ completed: boolean; reason: string; username?: string }>('bootstrap_done');
+      if (done?.completed && done.username === username) {
+        return Response.json({ ok: true, action: 'skipped', reason: 'already_done' });
+      }
+    }
+
+    // Acquire short-lived lock to prevent concurrent bootstrap
+    const lockKey = 'bootstrap_lock';
+    const lockTtlMs = 30_000;
+    const existingLock = await this.ctx.storage.get<{ acquiredAt: number }>(lockKey);
+    if (existingLock && Date.now() - existingLock.acquiredAt < lockTtlMs) {
+      return Response.json({ ok: true, action: 'skipped', reason: 'locked' });
+    }
+    await this.ctx.storage.put(lockKey, { acquiredAt: Date.now() });
+
+    try {
+      // Check D1 for any existing admin user
+      const existingAdmin = await this.env.DB.prepare(
+        'SELECT user_id FROM users WHERE admin = 1 LIMIT 1'
+      ).first<{ user_id: string }>();
+
+      if (existingAdmin) {
+        await this.ctx.storage.put('bootstrap_done', { completed: true, reason: 'admin_exists', username, at: Date.now() });
+        return Response.json({ ok: true, action: 'skipped', reason: 'admin_exists' });
+      }
+
+      // Validate localpart
+      if (!/^[a-z0-9._=-]+$/i.test(username)) {
+        await this.ctx.storage.put('bootstrap_done', { completed: true, reason: 'invalid_username', username, at: Date.now() });
+        return new Response(JSON.stringify({ ok: false, action: 'failed', reason: 'invalid_username' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Lazy imports to avoid module load cycle
+      const { hashPassword } = await import('../utils/crypto');
+      const { formatUserId, isValidLocalpart } = await import('../utils/ids');
+
+      if (!isValidLocalpart(username)) {
+        await this.ctx.storage.put('bootstrap_done', { completed: true, reason: 'invalid_username', username, at: Date.now() });
+        return new Response(JSON.stringify({ ok: false, action: 'failed', reason: 'invalid_username' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      const userId = formatUserId(username, this.env.SERVER_NAME);
+      const passwordHash = await hashPassword(password);
+
+      // Insert with admin=1
+      try {
+        await this.env.DB.prepare(
+          `INSERT INTO users (user_id, localpart, password_hash, is_guest, admin, created_at, updated_at)
+           VALUES (?, ?, ?, 0, 1, ?, ?)`
+        ).bind(userId, username, passwordHash, Date.now(), Date.now()).run();
+
+        await this.ctx.storage.put('bootstrap_done', { completed: true, reason: 'created', username, at: Date.now() });
+        console.log(`[bootstrap] Created admin user ${userId}`);
+        return Response.json({ ok: true, action: 'created', user_id: userId });
+      } catch (err) {
+        // Race: another instance may have just created the user
+        const msg = err instanceof Error ? err.message : String(err);
+        await this.ctx.storage.put('bootstrap_done', { completed: true, reason: 'race', username, at: Date.now() });
+        console.warn(`[bootstrap] Insert failed (likely race): ${msg}`);
+        return Response.json({ ok: true, action: 'skipped', reason: 'race' });
+      }
+    } finally {
+      await this.ctx.storage.delete(lockKey);
     }
   }
 

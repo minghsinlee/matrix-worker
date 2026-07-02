@@ -45,6 +45,7 @@ import { adminDashboardHtml } from './admin/dashboard';
 import { rateLimitMiddleware } from './middleware/rate-limit';
 import { requireAuth } from './middleware/auth';
 import { analyticsMiddleware } from './middleware/analytics';
+import { ensureBootstrapAdmin } from './utils/bootstrap';
 
 // Import Durable Objects
 export { RoomDurableObject, SyncDurableObject, FederationDurableObject, CallRoomDurableObject, AdminDurableObject, UserKeysDurableObject, PushDurableObject, RateLimitDurableObject } from './durable-objects';
@@ -68,6 +69,14 @@ app.use('*', cors({
 // Global middleware
 app.use('*', logger());
 app.use('*', analyticsMiddleware());
+
+// Ensure the bootstrap admin account exists before any auth check runs.
+// This is a cheap KV lookup on the hot path and only delegates to the
+// AdminDurable Object on first deployment.
+app.use('*', async (c, next) => {
+  c.executionCtx.waitUntil(ensureBootstrapAdmin(c.env));
+  return next();
+});
 
 // Rate limiting for Matrix API endpoints
 app.use('/_matrix/*', rateLimitMiddleware);

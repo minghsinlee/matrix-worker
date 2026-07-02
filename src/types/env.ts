@@ -33,6 +33,14 @@ export interface Env {
   ADMIN_CONTACT_MXID?: string;
   SUPPORT_PAGE_URL?: string;
 
+  // Bootstrap admin account (optional)
+  // If no admin user exists and both are set, a user with these credentials
+  // will be created automatically on the first request. Use as secrets:
+  //   npx wrangler secret put ADMIN_USERNAME
+  //   npx wrangler secret put ADMIN_PASSWORD
+  ADMIN_USERNAME?: string;
+  ADMIN_PASSWORD?: string;
+
   // Secrets (to be configured)
   SIGNING_KEY?: string;
 

@@ -13,6 +13,17 @@ import { fetchOIDCDiscovery } from '../services/oidc';
 
 const app = new Hono<AppEnv>();
 
+// GET /admin/api/bootstrap-status - Public endpoint to check bootstrap state.
+// Returns whether secrets are configured and whether any admin exists.
+// Useful for verifying deployment without needing to log in.
+app.get('/admin/api/bootstrap-status', async (c) => {
+  const id = c.env.ADMIN.idFromName('global');
+  const stub = c.env.ADMIN.get(id);
+  const response = await stub.fetch('http://internal/bootstrap/status');
+  const data = await response.json() as Record<string, unknown>;
+  return c.json(data);
+});
+
 // Admin authentication middleware
 const requireAdmin = createMiddleware<AppEnv>(async (c, next) => {
   const userId = c.get('userId');

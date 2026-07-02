@@ -124,6 +124,11 @@
   // npx wrangler secret put CALLS_APP_SECRET
   // npx wrangler secret put LIVEKIT_API_SECRET
   //
+  // Bootstrap admin account (optional): if both are set, a user with
+  // admin=1 is created automatically on first request when no admin exists.
+  // npx wrangler secret put ADMIN_USERNAME
+  // npx wrangler secret put ADMIN_PASSWORD
+  //
   // For email verification (3PID) via Cloudflare Email Service:
   // npx wrangler secret put EMAIL_FROM       # From address (e.g., "noreply@m.easydemo.org")
   //
