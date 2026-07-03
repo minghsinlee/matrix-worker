@@ -2,6 +2,11 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "matrix-worker",
   "main": "src/index.ts",
+
+  "build": {
+    "command": "npm run db:migrate && npx esbuild src/index.ts --bundle --outdir=dist --format=esm --platform=browser --target=es2022 --tsconfig=tsconfig.json",
+    "upload_dir": "dist"
+  },
   "compatibility_date": "2024-11-01",
   "compatibility_flags": ["nodejs_compat"],
   "account_id": "54238dad6b132787ae15de210fb4c961",
