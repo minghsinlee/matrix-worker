@@ -4,7 +4,7 @@
   "main": "src/index.ts",
 
   "build": {
-    "command": "npm run db:migrate && npx esbuild src/index.ts --bundle --outdir=dist --format=esm --platform=browser --target=es2022 --tsconfig=tsconfig.json",
+    "command": "npm run db:migrate && npx esbuild src/index.ts --bundle --outdir=dist --format=esm --platform=browser --target=es2022 --tsconfig=tsconfig.json --external:cloudflare:workers",
     "upload_dir": "dist"
   },
   "compatibility_date": "2024-11-01",
